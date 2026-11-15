@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: lidl-connect-refill
+    runtime: docker
+    region: frankfurt # 强制指定法兰克福节点
+    plan: free # 指定免费层
+    envVars:
+      - key: LIDL_USER
+        sync: false
+      - key: LIDL_PASS
+        sync: false
