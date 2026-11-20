@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 from playwright.sync_api import sync_playwright
+import random
 
 """手机号+密码"""
 PHONE_NUMBER = os.getenv("LIDL_USER", "")
@@ -16,7 +17,8 @@ if not PHONE_NUMBER or not PASSWORD:
     sys.exit(1)
 
 TARGET_URL = "https://kundenkonto.lidl-connect.de/mein-lidl-connect/uebersicht.html"
-CHECK_INTERVAL = 1800  # 每 30 分钟（1800 秒）检查一次，可自行调整
+MIN_INTERVAL = 1500
+MAX_INTERVAL = 1800
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -71,9 +73,9 @@ def do_login_with_verification(page) -> bool:
     pass_input.fill(PASSWORD)
     pass_input.dispatch_event("input")
 
-    if phone_input.input_value() != PHONE_NUMBER or len(pass_input.input_value()) == 0:
-        print("   ❌ 账号或密码填充校验失败")
-        return False
+    # if phone_input.input_value() != PHONE_NUMBER or len(pass_input.input_value()) == 0:
+    #     print("   ❌ 账号或密码填充校验失败")
+    #     return False
 
     print("正在提交登录...")
     login_btn = page.get_by_role("button", name="Einloggen")
@@ -144,13 +146,13 @@ def run_once(page):
         remaining_gb = get_remaining_data_gb(page)
         if remaining_gb is not None:
             print(f"   📊 当前剩余流量: {remaining_gb:.2f} GB")
-            if remaining_gb < 0.50:
-                print("   ⚡ 流量小于 0.50 GB，触发 Refill 点击！")
+            if remaining_gb < 1:
+                print("   ⚡ 流量小于 1 GB，触发 Refill 点击！")
                 refill_btn.click()
                 print("   ✅ 已成功点击 'Datenvolumen per Refill'！")
                 time.sleep(3)
             else:
-                print("   👌 流量充足（≥ 0.50 GB），无需重置。")
+                print("   👌 流量充足（ 1 GB），无需重置。")
         else:
             print("   ⚠️ 无法提取流量数值。")
     else:
@@ -168,6 +170,7 @@ def main():
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(
                     headless=True,
+                    slow_mo=500,
                     args=["--disable-blink-features=AutomationControlled"],
                 )
                 context = browser.new_context(
@@ -181,8 +184,10 @@ def main():
         except Exception as e:
             print(f"⚠️ 本轮运行出现异常（将在下一次循环重试）: {e}")
 
-        time.sleep(CHECK_INTERVAL)
-
+        # 在最小和最大间隔之间随机生成一个等待时间
+        sleep_time = random.randint(MIN_INTERVAL, MAX_INTERVAL)
+        print(f"   ⏳ 本轮检测结束，将在 {sleep_time // 60} 分 {sleep_time % 60} 秒后进行下一次检测...")
+        time.sleep(sleep_time)
 
 if __name__ == "__main__":
     main()
